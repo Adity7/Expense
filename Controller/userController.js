@@ -1,8 +1,7 @@
-const db = require('../config/db_connector');
-const User = require('../models/user');
 const bcrypt = require('bcryptjs');
+const { User, Record, sequelize } = require('../models'); 
 
-const addUser = async (req, res) => {
+exports.addUser = async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) {
     return res.status(400).json({ message: 'All fields are required' });
@@ -18,7 +17,7 @@ const addUser = async (req, res) => {
     });
 
     req.session.user = { id: newUser.id, username, email };
-    return res.json({ redirect: '/kirana' });
+    return res.json({ redirect: '/login' });
 
   } catch (error) {
     console.error("Signup Error:", error); // 👈 This helps you debug
@@ -26,82 +25,68 @@ const addUser = async (req, res) => {
   }
 };
 
-
-// const loginUser = async (req, res) => {
-//   const { email, password } = req.body;
-
-//   if (!email || !password) {
-//     return res.status(400).json({ message: 'Email and password are required' });
-//   }
-
-//   try {
-//     // Find user by email
-//     const newUser = await User.findOne({ where: { email } });
-
-//     if (!newUser) {
-//       return res.status(400).json({ message: 'User not found' });
-//     }
-
-//     // Compare hashed password
-//     const isValid = await bcrypt.compare(password, newUser.password);
-
-//     if (!isValid) {
-//       return res.status(400).json({ message: 'Invalid credentials' });
-//     }
-
-//     // Set session
-//     req.session.newUser = { id: newUser.id, username: newUser.username, email: newUser.email };
-
-//     // Send success response
-//     return res.json({ redirect: '/kirana' });
-
-//   } catch (error) {
-//     console.error("Login Error:", error);
-//     return res.status(500).json({ message: 'Internal server error', error: error.message });
-//   }
-// };
-
-// module.exports = {
-//     addUser,
-//     loginUser
-// }
-// Adjust path to your User model
-
 // Login controller function
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password required' });
-  }
-
+exports.loginUser = async (req, res) => {
   try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    // Find the user by their email
     const user = await User.findOne({ where: { email } });
-
     if (!user) {
-      return res.status(400).json({ message: 'User not found' });
+      return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (isValid) {
-    req.session.user = { id: user.id, username: user.username, email: user.email, role: user.role };
-    return res.json({ redirect: '/kirana' });
+    // Compare the provided password with the stored hashed password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    if (!isValid) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
+    // ===================================================================
+    // ✅ THIS IS THE FIX ✅
+    // ===================================================================
+    
+    // 1. Set the userId property on the session object.
+    //    This is the data that was missing.
+    req.session.userId = user.id;
 
-    req.session.user = { id: user.id, username: user.username, email };
-    return res.json({ redirect: '/kirana' });
+    // 2. Explicitly save the session to prevent any race conditions.
+    //    The response is sent only after the session is successfully saved.
+    req.session.save(err => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.status(500).json({ message: "Error logging in. Please try again." });
+      }
+      
+      // 3. Send the success response from inside the save callback.
+      console.log(`Session saved successfully for userId: ${req.session.userId}`);
+      res.status(200).json({
+        message: 'Login successful!',
+        redirect: '/tracker'
+      });
+    });
 
   } catch (error) {
-    console.error("Login Error:", error.message);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("LOGIN ERROR:", error);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 };
 
-getLoggedInUser = (req, res) => {
+exports.getProfile = async (req, res) => {
+  if (req.user) {
+    res.status(200).json(req.user);
+  } else {
+    // This case should not be reached if middleware is correctly applied.
+    res.status(401).json({ message: "Not authenticated." });
+  }
+};
+
+  
+exports.getLoggedInUser = (req, res) => {
     if (req.session.user && req.session.user.id) {
         // Return only the ID for security, or other non-sensitive info
         return res.status(200).json({ userId: req.session.user.id, username: req.session.user.username });
@@ -109,4 +94,59 @@ getLoggedInUser = (req, res) => {
         return res.status(401).json({ message: 'No user logged in.' });
     }
 };
-module.exports = { addUser, loginUser, getLoggedInUser }; // Make sure both are exported
+
+
+exports.getLeaderboard = async (req, res) => {
+    try {
+        const leaderboard = await User.findAll({
+            attributes: [
+                'id',
+                'email', // This matches your User model
+                [sequelize.fn('SUM', sequelize.col('records.amount')), 'totalExpenses']
+            ],
+            include: [{
+                model: Record,
+                as: 'records',
+                attributes: [],
+                where: { type: 'expense' },
+                required: true
+            }],
+            group: ['User.id', 'User.username'], // Fixed: Use table prefix
+            order: [[sequelize.literal('totalExpenses'), 'DESC']],
+            limit: 5,
+            subQuery: false
+        });
+
+        res.status(200).json(leaderboard);
+
+    } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+exports.getCurrentUserProfile = async (req, res) => {
+    try {
+        const userId = req.user.id; // Or however you get the logged-in user's ID
+        
+        const userProfile = await User.findByPk(userId, {
+            // This is the crucial part!
+            include: [{
+                model: Role,
+                attributes: ['name'], // We only need the name of the role
+                required: true // Use 'true' if every user MUST have a role. Use 'false' for an outer join if a role can be optional.
+            }],
+            attributes: ['id', 'email'] // Add other user fields you need
+        });
+
+        if (!userProfile) {
+            return res.status(404).json({ message: "User not found." });
+        }
+        
+        res.status(200).json(userProfile);
+
+    } catch (error) {
+        console.error("Error fetching user profile:", error);
+        res.status(500).json({ message: "Internal Server Error." });
+    }
+};

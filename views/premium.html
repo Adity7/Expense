@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Dashboard - Expense Tracker</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Main Stylesheet (path corrected) -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Dark Mode Stylesheet (path corrected) -->
+    <link rel="stylesheet" href="css/premium_dark.css" id="dark-mode-stylesheet" disabled>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="/premium"><i class="fas fa-chart-pie"></i> Expense Tracker</a>
+        <span class="navbar-text text-warning ml-2">
+            <i class="fas fa-star"></i> Premium
+        </span>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto align-items-center">
+                <!-- Dark Mode Toggle Switch -->
+                <li class="nav-item mr-3">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="darkModeSwitch">
+                        <label class="custom-control-label text-white" for="darkModeSwitch"><i class="fas fa-moon"></i></label>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <button id="logout-button" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Welcome Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h2">Premium Dashboard</h1>
+            <a href="/record" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Record</a>
+        </div>
+
+        <!-- Filters -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="date-filter">Filter by Month</label>
+                    <select id="date-filter" class="form-control"></select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="category-filter">Filter by Category</label>
+                    <select id="category-filter" class="form-control"></select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Summary Cards -->
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="card text-white bg-danger">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-arrow-down"></i> Total Expenses</h5>
+                        <p class="card-text h3" id="total-expenses">$0.00</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card text-white bg-success">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-arrow-up"></i> Total Revenues</h5>
+                        <p class="card-text h3" id="total-revenues">$0.00</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card text-white bg-info">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-balance-scale"></i> Current Balance</h5>
+                        <p class="card-text h3" id="balance">$0.00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Premium Feature: Monthly Trend Chart -->
+        <div class="card mb-4" id="premium-dashboard-widget">
+            <div class="card-header bg-warning text-dark">
+                <i class="fas fa-chart-line"></i> <strong>Premium: Monthly Trends</strong>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">A month-over-month comparison of your revenues and expenses.</p>
+                <div style="height: 350px;">
+                    <canvas id="monthlyTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW Premium Feature: Leaderboard -->
+        <div class="card mb-4">
+            <div class="card-header bg-purple text-white">
+                <i class="fas fa-trophy"></i> <strong>Premium: Expense Leaderboard</strong>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">See how your total spending compares to other premium users.</p>
+                <div id="leaderboard-container">
+                    <div class="text-center"><div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Standard Features (also on premium dashboard) -->
+        <div class="row">
+            <div class="col-lg-7 mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="fas fa-history"></i> Recent Records</div>
+                    <div class="card-body" id="record-list-container"></div>
+                </div>
+            </div>
+            <div class="col-lg-5 mb-4">
+                <div class="card">
+                    <div class="card-header"><i class="fas fa-tags"></i> Expenses by Category</div>
+                    <div class="card-body">
+                        <div style="height: 200px; margin-bottom: 20px;">
+                            <canvas id="categoryDonutChart"></canvas>
+                        </div>
+                        <div id="category-summary-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jQuery and Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <!-- This page's specific JavaScript (path corrected) -->
+    <script src="/js/premium.js"></script>
+</body>
+</html>

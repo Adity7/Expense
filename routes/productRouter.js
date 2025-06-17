@@ -1,13 +1,28 @@
+'use strict';
 const express = require('express');
 const router = express.Router();
-const productController = require('../Controller/productController');
+const recordController = require('../Controller/productController');
+const { ensureAuthenticated,  isPremium  } = require('../middleware/auth');
+
+// Protect all routes in this file
+router.use(ensureAuthenticated);
+
+router.get('/monthly-trend', isPremium, recordController.getMonthlyTrend);
+
+router.get('/categories', recordController.getAllCategories);
+
+router.get('/summary', recordController.getDashboardSummary);
 
 
-router.post('/', productController.addProduct);
 
-router.put('/:id', productController.updateProduct); // This is the crucial route for updating
-router.get('/', productController.getAllproducts); 
-router.put('/:id/buy',productController.BuyProduct);
-console.log('Defining DELETE /:id route for products');
-router.delete('/:id', productController.deleteProduct); 
+
+router.route('/')
+    .get(recordController.getAllRecords)
+    .post(recordController.createRecord);
+
+router.route('/:id')
+    .get(recordController.getRecordById)
+    .put(recordController.updateRecord)
+    .delete(recordController.deleteRecord);
+
 module.exports = router;

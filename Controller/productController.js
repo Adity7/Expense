@@ -1,172 +1,317 @@
-const db = require('../config/db_connector');
-const { Product } = require('../models/association');
 
-addProduct = async (req, res) => {
-    console.log("Received add product request with body:", req.body);
-    const { name, description, price, quantity } = req.body;
+const db = require('../models');
+const { Op } = require('sequelize');
+const sequelize = db.sequelize;
 
-    // Get the userId from the session of the logged-in user
-    const userId = req.session.user ? req.session.user.id : null;
+const Record = db.Record;
+const Category = db.Category;
+const User = db.User;
 
-    if (!userId) {
-        return res.status(401).json({ message: 'You must be logged in to add a product.' });
-    }
-
-    if (!name || !description || !price || !quantity) {
-        console.log("Validation failed:", { name, description, price, quantity });
-        return res.status(400).json({ message: 'All fields are required' });
-    }
-
+/**
+ * CREATE: Creates a new record for the logged-in user.
+ */
+exports.createRecord = async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+    
     try {
-        const existingProduct = await Product.findOne({ where: { name: name } });
+        // FIX: Added 'description' to be read from the request body
+        const { name, amount, date, type, categoryId, merchant, description } = req.body;
+        const userId = req.user.id;
 
-        if (existingProduct) {
-            return res.status(409).json({ message: `Candy with name "${name}" already exist.` });
-        }
-
-        const newProduct = await Product.create({
+        const newRecord = await Record.create({
             name,
-            description,
-            price,
-            quantity,
-            userId: userId // <--- ENSURE YOU ARE PROVIDING THE userId HERE
+            amount,
+            date,
+            type,
+            description, // Now this works
+            categoryId,
+            userId
         });
-        console.log("Product created successfully:", newProduct);
-        return res.status(201).json(newProduct);
-    } catch (err) {
-        console.error("Error creating product:", err);
-        return res.status(500).json({ message: 'Unable to create product', error: err.message });
-    }
-};
 
+        res.status(201).json(newRecord);
 
-// updateProduct = async (req, res) => {
-//     try {
-//         const id = req.params.id; // Extract the product ID from the URL parameters
-//         console.log(`Updating product with ID: ${id}`, req.body);
-//         const { name, description, price, quantity } = req.body;
-//         const product = await Product.findByPk(id);
-
-//         if (!product) {
-//             return res.status(404).send("Product not found");
-//         }
-
-//         product.name = name;
-//         product.description = description;
-//         product.price = price;
-//         product.quantity = quantity;
-//         await product.save();
-
-//         res.status(200).json(product); // Send the updated product data with 200 status
-//     } catch (error) {
-//         console.error("Error updating product:", error);
-//         res.status(500).send("Error updating product");
-//     }
-// };
-
-
-updateProduct = async (req, res) => {
-    try {
-        const id = req.params.id; // Get the ID from the URL parameters
-        console.log(`Updating product with ID: ${id}`, req.body);
-        const { name, description, price, quantity } = req.body;
-        const product = await Product.findByPk(id);
-
-        if (!product) {
-            return res.status(404).send("Product not found");
-        }
-
-        product.name = name;
-        product.description = description;
-        product.price = price;
-        product.quantity = quantity;
-        await product.save();
-
-        res.status(200).json(product); // Send the updated product data
     } catch (error) {
-        console.error("Error updating product:", error);
-        res.status(500).send("Error updating product");
+        console.error("Error creating record:", error);
+        if (error.name === 'SequelizeValidationError') {
+            return res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+        }
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
 
-getAllproducts = async(req, res)=> {
-    try{
-        const product = await Product.findAll();
-        res.status(200).json(product);
-    } catch(error){
-        console.error("Error fetching products:", error);
-        res.status(500).json({message: "Failed to fetch products", error: error.message});
-    }
-};
-
-BuyProduct = async(req, res) => {
+/**
+ * READ: Retrieves all records for the logged-in user, with optional filtering.
+ */
+exports.getAllRecords = async (req, res) => {
     try {
-        const id = req.params.id;
-        // Log the incoming request body and ID
-        console.log(`Backend: Received PUT request for product ID: ${id} with body:`, req.body);
+        const userId = req.user.id;
+        const { categoryId, type, limit } = req.query;
 
-        const { quantity } = req.body; // Expecting only quantity for buy action
+        const whereClause = { userId };
+        if (categoryId) whereClause.categoryId = categoryId;
+        if (type) whereClause.type = type;
 
-        // Basic validation for quantity
-        if (typeof quantity === 'undefined' || quantity === null || isNaN(quantity)) {
-            console.log("Backend: Quantity is invalid or missing.");
-            return res.status(400).send("Invalid quantity provided.");
-        }
+        const records = await Record.findAll({
+            where: whereClause,
+            limit: limit ? parseInt(limit) : undefined,
+            include: [{
+                model: Category,
+                as: 'category',
+                attributes: ['name', 'icon']
+            }],
+            order: [['date', 'DESC']]
+        });
 
-        const product = await Product.findByPk(id);
-
-        if (!product) {
-            console.log(`Backend: Product with ID ${id} not found.`);
-            return res.status(404).send("Product not found");
-        }
-
-        // Log current and new quantity
-        console.log(`Backend: Product ${product.name} (ID: ${id}) - Old quantity: ${product.quantity}, New quantity: ${quantity}`);
-
-        product.quantity = quantity; // Update the quantity
-        await product.save(); // Save changes to the database
-
-        console.log(`Backend: Product ${product.name} (ID: ${id}) quantity updated successfully to ${product.quantity}.`);
-        res.status(200).json(product); // Send the updated product
+        res.status(200).json(records);
     } catch (error) {
-        console.error("Backend: Error updating product quantity:", error);
-        res.status(500).send("Error updating product quantity");
+        console.error("Error fetching records:", error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-deleteProduct = async(req, res) =>{
+/**
+ * UPDATE: Updates an existing record by its ID.
+ */
+exports.updateRecord = async (req, res) => {
     try {
-        const id = req.params.id; // Get the ID from the URL parameters
-        console.log(`Attempting to delete product with ID: ${id}`);
+        const recordId = req.params.id;
+        const userId = req.user.id;
 
-        const product = await Product.findByPk(id);
-
-        if (!product) {
-            console.log(`Product with ID ${id} not found.`);
-            return res.status(404).json({ message: 'Product not found.' });
+        const record = await Record.findOne({ where: { id: recordId, userId: userId } });
+        if (!record) {
+            return res.status(404).json({ message: 'Record not found or you do not have permission to edit it.' });
         }
 
-        // Authorization check: Ensure the logged-in user owns this product
-        const userId = req.session.user ? req.session.user.id : null;
-        if (!userId || product.userId !== userId) {
-            console.log(`User ${userId} attempted to delete product ${id} but is not the owner (owner: ${product.userId}).`);
-            return res.status(403).json({ message: 'You are not authorized to delete this product.' });
-        }
-
-        await product.destroy(); // Delete the product from the database
-        console.log(`Product with ID ${id} deleted successfully.`);
-        return res.status(204).send(); // 204 No Content for successful deletion
+        const updatedRecord = await record.update(req.body);
+        res.status(200).json(updatedRecord);
     } catch (error) {
-        console.error("Error deleting product:", error);
-        return res.status(500).json({ message: 'Unable to delete product', error: error.message });
+        console.error("Error updating record:", error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-module.exports = { 
-    addProduct,
-    updateProduct,
-    getAllproducts,
-    BuyProduct,
-    deleteProduct
+/**
+ * DELETE: Deletes a record by its ID.
+ */
+exports.deleteRecord = async (req, res) => {
+    try {
+        const recordId = req.params.id;
+        const userId = req.user.id;
+
+        const record = await Record.findOne({ where: { id: recordId, userId: userId } });
+        if (!record) {
+            return res.status(404).json({ message: 'Record not found or you do not have permission to delete it.' });
+        }
+
+        await record.destroy();
+        res.status(204).send();
+    } catch (error) {
+        console.error("Error deleting record:", error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+/**
+ * SUMMARY: Gets calculated summary data for the dashboard UI.
+ */
+exports.getDashboardSummary = async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+
+    try {
+        const userId = req.user.id;
+        const { date } = req.query;
+
+        const whereClause = { userId: userId };
+        if (date && date !== 'all') {
+            const startDate = new Date(`${date}-01T00:00:00Z`);
+            const nextMonth = new Date(startDate);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            whereClause.date = { [Op.gte]: startDate, [Op.lt]: nextMonth };
+        }
+
+        const totals = await Record.findAll({
+            where: whereClause,
+            attributes: [
+                'type',
+                [sequelize.fn('SUM', sequelize.col('amount')), 'totalAmount'],
+            ],
+            group: ['type']
+        });
+
+        let totalExpenses = 0;
+        let totalRevenues = 0;
+
+        totals.forEach(item => {
+            const type = item.getDataValue('type');
+            const amount = parseFloat(item.getDataValue('totalAmount')) || 0;
+            if (type === 'expense') {
+                totalExpenses = amount;
+            } else if (type === 'revenue') {
+                totalRevenues = amount;
+            }
+        });
+
+        const balance = totalRevenues - totalExpenses;
+        const monthlyLimit = req.user.budget || 0;
+        const remaining = monthlyLimit - totalExpenses;
+
+        res.status(200).json({
+            totalExpenses,
+            totalRevenues,
+            balance,
+            monthlyLimit,
+            remaining
+        });
+
+    } catch (error) {
+        console.error("Error fetching dashboard summary:", error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+
+exports.getRecordById = async (req, res) => {
+  // This check should be handled by your 'ensureAuthenticated' middleware,
+  // which also creates req.user.
+  // if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  
+  try {
+    const userId = req.user.id;
+    const recordId = req.params.id;
+
+    const record = await Record.findOne({
+      where: { 
+        id: recordId, 
+        userId: userId // Ensures user can only get their own record
+      },
+      // ✅ THIS IS THE FIX ✅
+      // When including a model that has an alias ('as'),
+      // you must specify that alias in the include statement.
+      include: [{
+        model: Category,
+        as: 'category'
+      }]
+    });
+
+    if (!record) {
+      return res.status(404).json({ message: 'Record not found.' });
+    }
+
+    res.status(200).json(record);
+  } catch (error) {
+    console.error("Error fetching single record:", error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+exports.getAllCategories = async (req, res) => {
+  try {
+    const categories = await Category.findAll({
+      order: [['name', 'ASC']] // Order them alphabetically
+    });
+    res.status(200).json(categories);
+  } catch (err) {
+    console.error("Error fetching categories:", err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.getCategorySummary = async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+
+    try {
+        const userId = req.user.id;
+        const { date } = req.query;
+
+        const whereClause = { userId: userId, type: 'expense' }; // Only summarize expenses
+
+        if (date && date !== 'all') {
+            const startDate = new Date(`${date}-01T00:00:00Z`);
+            const nextMonth = new Date(startDate);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            whereClause.date = { [Op.gte]: startDate, [Op.lt]: nextMonth };
+        }
+
+        const summary = await Record.findAll({
+            where: whereClause,
+            attributes: [
+                [sequelize.fn('SUM', sequelize.col('amount')), 'totalAmount'],
+            ],
+            include: [{
+                model: Category,
+                attributes: ['name', 'icon'],
+                required: true // Ensures we only get records with a category
+            }],
+            group: ['Category.id', 'Category.name', 'Category.icon'],
+            order: [[sequelize.fn('SUM', sequelize.col('amount')), 'DESC']]
+        });
+        
+        // The result from Sequelize is slightly nested, so we re-map it for the frontend
+        const formattedSummary = summary.map(item => ({
+            name: item.Category.name,
+            icon: item.Category.icon,
+            totalAmount: item.getDataValue('totalAmount')
+        }));
+
+        res.status(200).json(formattedSummary);
+
+    } catch (error) {
+        console.error("Error fetching category summary:", error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+exports.getMonthlyTrend = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { categoryId } = req.query; // Handle optional category filter
+
+        const whereClause = { userId };
+        if (categoryId) {
+            whereClause.categoryId = categoryId;
+        }
+
+        const monthlyData = await Record.findAll({
+            where: whereClause,
+            attributes: [
+                // Group by month, e.g., '2025-06'. This format is for MySQL.
+                // For PostgreSQL use: TO_CHAR("date", 'YYYY-MM')
+                // For SQLite use: strftime('%Y-%m', "date")
+                [sequelize.fn('DATE_FORMAT', sequelize.col('date'), '%Y-%m'), 'month'],
+                
+                // Calculate total revenues for the month
+                [
+                    sequelize.fn('SUM', sequelize.literal('CASE WHEN `type` = "revenue" THEN `amount` ELSE 0 END')),
+                    'totalRevenues'
+                ],
+
+                // Calculate total expenses for the month
+                [
+                    sequelize.fn('SUM', sequelize.literal('CASE WHEN `type` = "expense" THEN `amount` ELSE 0 END')),
+                    'totalExpenses'
+                ]
+            ],
+            group: ['month'],
+            order: [[sequelize.col('month'), 'ASC']]
+        });
+
+        // Format the data for the Chart.js frontend
+        const labels = monthlyData.map(item => item.get('month'));
+        const revenues = monthlyData.map(item => parseFloat(item.get('totalRevenues')));
+        const expenses = monthlyData.map(item => parseFloat(item.get('totalExpenses')));
+
+        res.status(200).json({
+            labels,
+            revenues,
+            expenses
+        });
+
+    } catch (error) {
+        console.error("Error fetching monthly trend data:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
 };

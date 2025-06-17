@@ -1,0 +1,83 @@
+<!-- File 1: Your corrected HTML for the "Add Revenue" page -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Revenue</title>
+    <!-- Using Bootstrap 4.6.2 for consistency -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style>
+        body { background-color: #f8f9fa; }
+        .form-container { max-width: 800px; }
+        .field-required { color: red; margin-left: 4px; }
+    </style>
+</head>
+<body>
+
+ <header>
+        <nav class='navbar navbar-expand-lg navbar-dark bg-dark mx-3'>
+            <a class='navbar-brand' href='/tracker'>Expense Tracker</a>
+        </nav>
+    </header>
+
+
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12 col-lg-10 col-xl-8 mx-auto form-container">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-plus-circle text-success"></i> Add Revenue</h5>
+                    <hr>
+
+                    <!-- FIX 1: Added id="revenue-form" to the form tag -->
+                    <form class="row g-3" id="revenue-form" action="/api/records" method="POST">
+                        
+                        <div class="col-md-12 row mb-3 align-items-center">
+                            <label for="name" class="col-md-3 col-form-label">Name<span class="field-required">*</span></label>
+                            <div class="col-md-9">
+                                <input type="text" name="name" class="form-control" id="name" required maxlength="50">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-12 row mb-3 align-items-center">
+                            <label for="date" class="col-md-3 col-form-label">Date<span class="field-required">*</span></label>
+                            <div class="col-md-9">
+                                <input type="date" name="date" class="form-control" id="date" required>
+                            </div>
+                        </div>
+
+                         <div class="col-md-12 row mb-3 ml-1 mr-4">
+                                <label for="record-type" class="col-md-4 col-form-label">Type<span class="field-required">*</span></label>
+                                <select class="custom-select col-md-8" id="record-type" required>
+                                    <option value="" disabled selected>Select Type</option>
+                                    <option value="revenue">Revenue</option>
+                                </select>
+                            </div>
+                        
+                        <div class="col-md-12 row mb-3 align-items-center">
+                            <label for="amount" class="col-md-3 col-form-label">Amount<span class="field-required">*</span></label>
+                            <div class="col-md-9">
+                                <input type="number" name="amount" class="form-control" id="amount" required min="0.01" step="0.01">
+                            </div>
+                        </div>
+                        
+                        <!-- FIX 3: Changed the hidden input value to "revenue" -->
+                        <input type="hidden" name="type" value="revenue">
+                        
+                        <div class="col-md-12 d-flex justify-content-end">
+                            <a href="/" class="btn btn-secondary mr-2">Cancel</a>
+                            <button class="btn btn-success" type="submit">Create Revenue</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FIX 4: Changed script src to be more specific -->
+<script src="/revenue.js"></script>
+</body>
+</html>

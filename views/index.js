@@ -1,341 +1,252 @@
-// --- Global Variables / DOM Element References (existing) ---
-const REST_API = '/api/product';
-const USER_API = '/api/users';
+'use strict';
 
-const nameInput = document.getElementById("candyName"); // Corrected ID to match HTML
-const descInput = document.getElementById("description");
-const priceInput = document.getElementById("price");
-const quantityInput = document.getElementById("quantity");
-const form = document.getElementById("candyForm");
-const ul = document.getElementById("candyList"); // Corrected ID to match HTML
-const searchInput = document.getElementById("search");
-const submitButton = form.querySelector('button[type="submit"]');
-const formTitle = document.getElementById("formTitle");
+document.addEventListener('DOMContentLoaded', () => {
 
-let candies = [];
-let isEditMode = false;
-let currentEditCandyId = null;
-let loggedInUserId = null;
+    // --- CHART INSTANCES ---
+    let categoryChart;
 
-// --- New DOM Element References for Buttons ---
-const loginButton = document.getElementById('loginButton'); // Assuming you add an ID to the login button link/anchor
-const signupButton = document.getElementById('signupButton'); // Assuming you add an ID to the signup button link/anchor
-const logoutButton = document.querySelector('.logout-btn'); // Already exists
+    // --- DOM ELEMENTS ---
+    const dateFilter = document.getElementById('date-filter');
+    const categoryFilter = document.getElementById('category-filter');
+    const recordListContainer = document.getElementById('record-list-container');
+    const logoutButton = document.getElementById('logout-button');
+    const upgradeButton = document.getElementById('upgrade-to-premium-btn');
 
-// --- Helper Functions (existing) ---
-function showAlert(message, type) {
-    const alertDiv = document.getElementById('alertMessage');
-    if (alertDiv) {
-        alertDiv.textContent = message;
-        alertDiv.className = `alert ${type}`;
-        alertDiv.style.display = 'block';
-        setTimeout(() => {
-            alertDiv.style.display = 'none';
-            alertDiv.textContent = '';
-        }, 3000);
-    } else {
-        console.warn('Alert message div not found. Message:', message);
-    }
-}
+    // =========================================================================
+    // --- API & HELPER FUNCTIONS ---
+    // =========================================================================
 
-function resetForm() {
-    form.reset();
-    isEditMode = false;
-    currentEditCandyId = null;
-    submitButton.textContent = "Add Candy"; // Consistent naming
-    if (formTitle) {
-        formTitle.textContent = "Add New Candy";
-    }
-}
-
-// --- Function to manage button visibility ---
-function updateAuthButtonsVisibility() {
-    // Hide login/signup if logged in, show logout
-    if (loggedInUserId) {
-        if (loginButton) loginButton.style.display = 'none';
-        if (signupButton) signupButton.style.display = 'none';
-        if (logoutButton) logoutButton.style.display = 'block'; // Or 'inline-block' depending on your CSS
-    } else {
-        // Show login/signup if not logged in, hide logout
-        if (loginButton) loginButton.style.display = 'block'; // Or 'inline-block'
-        if (signupButton) signupButton.style.display = 'block'; // Or 'inline-block'
-        if (logoutButton) logoutButton.style.display = 'none';
-    }
-}
-
-// --- Main API Interaction Functions (existing, with minor updates) ---
-
-async function fetchCandies() {
-    try {
-        const productsResponse = await axios.get(REST_API);
-        candies = productsResponse.data;
-
-        // Fetch user info to determine login status
-        const userResponse = await axios.get(`${USER_API}/me`);
-        if (userResponse.data && userResponse.data.userId) {
-            loggedInUserId = userResponse.data.userId;
-            console.log("Logged in user ID:", loggedInUserId);
-        } else {
-            loggedInUserId = null;
-            console.log("No user logged in or user ID not found.");
-        }
-
-        // --- IMPORTANT: Update button visibility after determining login status ---
-        updateAuthButtonsVisibility();
-
-        displayCandies(candies, loggedInUserId);
-    } catch (error) {
-        console.error("Failed to fetch candies or user info:", error);
-        showAlert("Failed to load candies or user info. Please check console and server.", "error");
-
-        // Even if fetching fails, update button visibility based on whether loggedInUserId was set
-        updateAuthButtonsVisibility();
-
-        displayCandies(candies, loggedInUserId);
-    }
-}
-
-async function addCandy(candy) {
-    console.log("Sending candy data:", { ...candy, userId: loggedInUserId });
-    try {
-        const response = await axios.post(REST_API, { ...candy, userId: loggedInUserId });
-        console.log("Add candy response:", response.data);
-        candies.push(response.data);
-        displayCandies(candies, loggedInUserId);
-        showAlert("Candy added successfully!", "success");
-        resetForm();
-    } catch (error) {
-        console.error("Failed to add candy:", error);
-        if (error.response) {
-            if (error.response.status === 401) {
-                showAlert("You must be logged in to add a product.", "error");
-                window.location.href = '/login'; // Redirect to login on unauthorized
-            } else if (error.response.status === 409) {
-                showAlert(error.response.data.message, "error");
-            } else {
-                showAlert(`Failed to add candy: ${error.response.data?.message || error.response.statusText}`, "error");
+    async function fetchData(url, options = {}) {
+        try {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+            };
+            const config = { ...defaultOptions, ...options };
+            if (config.body && typeof config.body !== 'string') {
+                config.body = JSON.stringify(config.body);
             }
-        } else if (error.request) {
-            showAlert("No response from server. Please check your internet connection.", "error");
-        } else {
-            showAlert(`An unexpected error occurred: ${error.message}`, "error");
-        }
-    }
-}
-
-async function updateCandy(candyId, candyData) {
-    try {
-        await axios.put(`${REST_API}/${candyId}`, candyData);
-        candies = candies.map(c => c.id === candyId ? { ...c, ...candyData } : c);
-        displayCandies(candies, loggedInUserId);
-        showAlert("Candy updated successfully!", "success");
-        resetForm();
-    } catch (error) {
-        console.error("Failed to update candy:", error);
-        if (error.response) {
-            if (error.response.status === 401 || error.response.status === 403) {
-                showAlert("You are not authorized to update this product. Please log in as the owner.", "error");
-                window.location.href = '/login'; // Redirect if unauthorized/forbidden
-            } else {
-                showAlert(`Failed to update candy: ${error.response.data?.message || error.response.statusText}`, "error");
+            const response = await fetch(url, config);
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return null;
             }
+            if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+            if (response.status === 204) return true;
+            return response.json();
+        } catch (error) {
+            console.error(`Failed to fetch from ${url}:`, error);
+            return null;
+        }
+    }
+
+    function formatDate(dateString) {
+        return new Date(dateString + 'T00:00:00').toLocaleDateString();
+    }
+    
+    function showNotification(message, type = 'success') {
+        console.log(`NOTIFICATION (${type}): ${message}`);
+        // Replace with a real toast/notification UI
+    }
+
+    // =========================================================================
+    // --- DATA LOADING & RENDERING (Standard Features) ---
+    // =========================================================================
+
+    async function loadDashboardSummary(filters) {
+        const summary = await fetchData(`/api/records/summary?${filters}`);
+        if (summary) {
+            document.getElementById('total-expenses').textContent = `-$${summary.totalExpenses.toFixed(2)}`;
+            document.getElementById('total-revenues').textContent = `+$${summary.totalRevenues.toFixed(2)}`;
+            document.getElementById('balance').textContent = `$${summary.balance.toFixed(2)}`;
+        }
+    }
+
+    async function loadRecentRecords(filters) {
+        const records = await fetchData(`/api/records?${filters}&limit=10`);
+        if (!records) {
+            recordListContainer.innerHTML = '<div class="alert alert-warning">Could not load records.</div>';
+            return;
+        }
+        if (records.length === 0) {
+            recordListContainer.innerHTML = '<div class="alert alert-info">No records found.</div>';
+            return;
+        }
+        const recordsHtml = records.map(record => {
+            const isExpense = record.type === 'expense';
+            const amountClass = isExpense ? 'text-danger' : 'text-success';
+            const amountSign = isExpense ? '-' : '+';
+            const categoryIcon = record.Category?.icon || 'fas fa-question-circle';
+            return `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="${categoryIcon} fa-lg mr-3 text-secondary"></i>
+                        <span class="font-weight-bold">${record.name}</span>
+                        <small class="text-muted ml-2">${formatDate(record.date)}</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="font-weight-bold mr-3 ${amountClass}">${amountSign}$${record.amount}</span>
+                        <a href="/edit-record.html?id=${record.id}" class="btn btn-sm btn-outline-primary mr-2"><i class="fas fa-edit"></i></a>
+                        <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${record.id}" data-name="${record.name}"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>`;
+        }).join('');
+        recordListContainer.innerHTML = `<div class="list-group">${recordsHtml}</div>`;
+    }
+
+    async function loadCategorySummary(filters) {
+        const summary = await fetchData(`/api/records/categories?${filters}`);
+        const container = document.getElementById('category-summary-container');
+        if (!summary || !container) return;
+        if (categoryChart) categoryChart.destroy();
+        if (summary.length === 0) {
+            container.innerHTML = '<p class="text-muted">No expense data for charts.</p>';
+            document.getElementById('categoryDonutChart').style.display = 'none';
+            return;
+        }
+        document.getElementById('categoryDonutChart').style.display = 'block';
+        container.innerHTML = summary.map(cat => `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div><i class="${cat.icon} mr-2 text-secondary"></i>${cat.name}</div>
+                <span class="font-weight-bold">-$${parseFloat(cat.totalAmount).toFixed(2)}</span>
+            </div>`).join('');
+        updateCategoryChart(summary.map(c => c.name), summary.map(c => c.totalAmount));
+    }
+
+    function updateCategoryChart(labels, data) {
+        const ctx = document.getElementById('categoryDonutChart')?.getContext('2d');
+        if (!ctx) return;
+        categoryChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{ data: data, backgroundColor: ['#ff6b81', '#00a8ff', '#4cd137', '#fbc531', '#9c88ff'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    // =========================================================================
+    // --- INITIALIZATION & EVENT LISTENERS ---
+    // =========================================================================
+    
+    /**
+     * **CRITICAL CHANGE**: Checks user role and redirects if premium.
+     * If not premium, it shows the upgrade button.
+     */
+    async function checkUserRoleAndRedirect() {
+        const profile = await fetchData('/api/users/me');
+        console.log('Fetched user profile for role:', profile);
+        if (profile && profile.Role && profile.Role.name === 'premium') {
+            // User is premium, redirect to the premium dashboard.
+            // Using .html is safer if you aren't using a specific server-side route for '/premium'.
+            window.location.href = '/premium';
         } else {
-            showAlert("Failed to update candy. Please check console and server.", "error");
+            // User is not premium, make sure the upgrade button is visible
+            if(upgradeButton) upgradeButton.style.display = 'block';
         }
     }
-}
-
-async function deleteCandy(candyId) {
-    try {
-        await axios.delete(`${REST_API}/${candyId}`);
-        candies = candies.filter(c => c.id !== candyId);
-        displayCandies(candies, loggedInUserId);
-        showAlert("Candy deleted successfully!", "success");
-    } catch (error) {
-        console.error("Failed to delete candy:", error);
-        if (error.response) {
-            if (error.response.status === 401 || error.response.status === 403) {
-                showAlert("You are not authorized to delete this product. Please log in as the owner.", "error");
-                window.location.href = '/login'; // Redirect if unauthorized/forbidden
-            } else if (error.response.status === 404) {
-                showAlert("Candy not found for deletion.", "error");
-            } else {
-                showAlert(`Failed to delete candy: ${error.response.data?.message || error.response.statusText}`, "error");
-            }
-        } else {
-            showAlert("Failed to delete candy. Please check console and server.", "error");
-        }
-    }
-}
-
-async function buyCandy(candyId, amount, currentUserId) {
-    const candyToBuy = candies.find(c => c.id === candyId);
-    if (!candyToBuy) {
-        showAlert("Candy not found!", "error");
-        return;
-    }
-    if (candyToBuy.quantity < amount) {
-        showAlert(`Not enough stock! Only ${candyToBuy.quantity} available.`, "error");
-        return;
-    }
-    try {
-        const updatedQuantity = candyToBuy.quantity - amount;
-        await axios.put(`${REST_API}/${candyId}/buy`, { quantity: updatedQuantity });
-        showAlert(`Successfully purchased ${amount} ${candyToBuy.name}(s)!`, "success");
-        fetchCandies(); // Re-fetch to ensure consistency and handle 0 quantity removal
-    } catch (error) {
-        console.error("Buy failed:", error);
-        if (error.response) {
-            if (error.response.status === 401) {
-                 showAlert("You must be logged in to buy products.", "error");
-                 window.location.href = '/login';
-            } else if (error.response.status === 403) {
-                 showAlert("You cannot buy your own product.", "error");
-            } else {
-                showAlert(`Failed to purchase candy: ${error.response.data?.message || error.response.statusText}`, "error");
-            }
-        } else {
-            showAlert("Failed to purchase candy. Please check console and server.", "error");
-        }
-    }
-}
-
-// --- Display / Render Function (existing, with minor updates) ---
-function displayCandies(candyList, currentUserId) {
-    ul.innerHTML = '';
-    if (candyList.length === 0) {
-        const emptyMessage = document.createElement("p");
-        emptyMessage.textContent = searchInput.value ?
-            "No candies match your search." :
-            "No candies available. Add some!";
-        emptyMessage.className = "empty-message";
-        ul.appendChild(emptyMessage);
-        return;
-    }
-    candyList.forEach(candy => {
-        const li = document.createElement("li");
-        li.setAttribute('data-candy-id', candy.id);
-
-        const isCreator = currentUserId && (candy.userId === currentUserId);
-
-        let candyInfoHtml = `
-            <span class="candy-name">${candy.name}</span> -
-            <span class="candy-description">${candy.description}</span> -
-            ₹<span class="candy-price">${parseFloat(candy.price).toFixed(2)}</span> -
-            Qty: <span class="candy-quantity">${candy.quantity}</span>
-        `;
-
-        if (candy.creator && candy.creator.username) {
-            candyInfoHtml += ` <span class="creator-info">(by ${candy.creator.username})</span>`;
-        } else if (isCreator) {
-            candyInfoHtml += ` <span class="creator-info">(Your Product)</span>`;
-        }
-
-        li.innerHTML = candyInfoHtml;
-
-        if (!isCreator) {
-            [1, 2, 3].forEach(amount => {
-                const btn = document.createElement("button");
-                btn.textContent = `Buy ${amount}`;
-                btn.className = "buy-btn";
-                btn.disabled = candy.quantity < amount;
-                btn.addEventListener("click", () => buyCandy(candy.id, amount, currentUserId));
-                li.appendChild(btn);
+    
+    async function initializeFilters() {
+        const categories = await fetchData('/api/records/categories');
+        if (categories) {
+            categoryFilter.innerHTML = '<option value="">All Categories</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                categoryFilter.appendChild(option);
             });
         }
+        dateFilter.innerHTML = '<option value="">All Time</option><option value="2025-06">June 2025</option><option value="2025-05">May 2025</option>';
+    }
 
-        if (isCreator) {
-            const editButton = document.createElement("button");
-            editButton.textContent = "Edit";
-            editButton.className = "edit-btn";
-            editButton.addEventListener("click", () => handleEditButtonClick(candy.id));
-            const deleteButton = document.createElement("button");
-            deleteButton.textContent = "Delete";
-            deleteButton.className = "delete-btn";
-            deleteButton.addEventListener("click", () => {
-                if (confirm(`Are you sure you want to delete ${candy.name}?`)) {
-                    deleteCandy(candy.id);
+    /**
+     * Handles any filter change.
+     * THIS FUNCTION HAS BEEN FIXED.
+     */
+    async function handleFilterChange() {
+        // This is a more robust way to build query strings than the previous regex method.
+        // It correctly handles cases where one or both filters are empty.
+        const params = new URLSearchParams();
+        if (categoryFilter.value) {
+            params.append('categoryId', categoryFilter.value);
+        }
+        if (dateFilter.value) {
+            params.append('date', dateFilter.value);
+        }
+        
+        const filterString = params.toString();
+
+        loadDashboardSummary(filterString);
+        loadRecentRecords(filterString);
+        loadCategorySummary(filterString);
+    }
+    
+    async function handleUpgradeClick() {
+        const order = await fetchData('/api/payments/create-order', { method: 'POST' });
+        if (!order) {
+            showNotification('Could not create payment order.', 'error');
+            return;
+        }
+        const options = {
+            key: "rzp_test_9WxtwyYeUJJ9NE",
+            order_id: order.id,
+            handler: async (response) => {
+                const result = await fetchData('/api/payments/verify', { method: 'POST', body: response });
+                if (result) {
+                    showNotification(result.message || 'Payment successful!', 'success');
+                    setTimeout(() => window.location.reload(), 1500); // Reload to trigger redirect
+                } else {
+                    showNotification('Payment verification failed.', 'error');
                 }
-            });
-
-            li.appendChild(editButton);
-            li.appendChild(deleteButton);
-        }
-
-        ul.appendChild(li);
-    });
-}
-
-// --- Edit Form Handler (existing) ---
-function handleEditButtonClick(candyId) {
-    const candyToEdit = candies.find(c => c.id === candyId);
-    if (candyToEdit) {
-        nameInput.value = candyToEdit.name;
-        descInput.value = candyToEdit.description;
-        priceInput.value = candyToEdit.price;
-        quantityInput.value = candyToEdit.quantity;
-
-        isEditMode = true;
-        currentEditCandyId = candyToEdit.id;
-        submitButton.textContent = "Update Candy"; // Consistent naming
-        if (formTitle) {
-            formTitle.textContent = "Edit Candy";
-        }
-    } else {
-        showAlert("Candy not found for editing.", "error");
-    }
-}
-
-// --- Event Listeners (existing, with minor updates) ---
-document.addEventListener('DOMContentLoaded', function () {
-    // Get references to the login/signup buttons once the DOM is ready
-    // You need to add IDs to your HTML anchor tags for these:
-    // <a href="/login" id="loginButton">Login</a>
-    // <a href="/signup" id="signupButton">Sign Up</a>
-    const loginButtonElement = document.getElementById('loginButton');
-    const signupButtonElement = document.getElementById('signupButton');
-
-    // Assign global references if they exist
-    if (loginButtonElement) window.loginButton = loginButtonElement;
-    if (signupButtonElement) window.signupButton = signupButtonElement;
-
-    fetchCandies(); // Fetch candies and check login status on load
-
-    form.addEventListener('submit', async function (event) {
-        event.preventDefault();
-
-        const candyData = {
-            name: nameInput.value.trim(),
-            description: descInput.value.trim(),
-            price: parseFloat(priceInput.value),
-            quantity: parseInt(quantityInput.value)
+            },
         };
-
-        if (!candyData.name || !candyData.description || isNaN(candyData.price) || isNaN(candyData.quantity)) {
-            showAlert("Please fill in all fields correctly.", "error");
-            return;
-        }
-        if (candyData.price < 0 || candyData.quantity < 0) {
-            showAlert("Price and quantity cannot be negative.", "error");
-            return;
-        }
-
-        if (isEditMode) {
-            await updateCandy(currentEditCandyId, candyData);
+        new Razorpay(options).open();
+    }
+    
+    async function handleDeleteRecord(recordId) {
+        const result = await fetchData(`/api/records/${recordId}`, { method: 'DELETE' });
+        if (result) {
+            showNotification('Record deleted.', 'success');
+            handleFilterChange();
         } else {
-            await addCandy(candyData);
+            showNotification('Failed to delete record.', 'error');
         }
-    });
+    }
+    
+    function setupEventListeners() {
+        dateFilter.addEventListener('change', handleFilterChange);
+        categoryFilter.addEventListener('change', handleFilterChange);
+        if(upgradeButton) upgradeButton.addEventListener('click', handleUpgradeClick);
+        
+        logoutButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await fetchData('/api/users/logout', { method: 'POST' });
+            window.location.href = '/login';
+        });
 
-    searchInput.addEventListener('input', function () {
-        const searchTerm = searchInput.value.toLowerCase();
-        const filteredCandies = candies.filter(candy =>
-            candy.name.toLowerCase().includes(searchTerm) ||
-            candy.description.toLowerCase().includes(searchTerm)
-        );
-        displayCandies(filteredCandies, loggedInUserId);
-    });
+        recordListContainer.addEventListener('click', (e) => {
+            const deleteButton = e.target.closest('.delete-btn');
+            if (deleteButton) {
+                if (confirm(`Delete "${deleteButton.dataset.name}"?`)) {
+                    handleDeleteRecord(deleteButton.dataset.id);
+                }
+            }
+        });
+    }
 
-    // Logout button handler (already exists)
-    // The confirmLogout() function is called via onclick in HTML
+    async function init() {
+        // First, check the user's role. This will redirect if they are premium.
+        // The rest of the code will only run for standard users.
+        await checkUserRoleAndRedirect();
+        
+        setupEventListeners();
+        await initializeFilters();
+        await handleFilterChange();
+    }
+
+    init();
 });
+
+

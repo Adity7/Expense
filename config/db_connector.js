@@ -5,7 +5,7 @@ const sequelize = new Sequelize({
     dialect: 'mysql',
     username: 'root',
     password: 'abc123',
-    database: 'Shopping',
+    database: 'sindoor',
     logging: console.log // <--- ADD THIS LINE to enable Sequelize logging
 });
 

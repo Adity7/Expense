@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add {{type}}</title>
+
+  <!-- Bootstrap -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"> 
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"> 
+
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .field-required {
+      color: red;
+      margin-left: 2px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <nav class='navbar navbar-expand-lg navbar-dark bg-dark mx-3'>
+      <a class='navbar-brand' href='/premium'>Expense Tracker</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="row py-5">
+      <div class="col-12 col-lg-10 col-xl-8 mx-auto form-container">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title"><i class="fas fa-plus-circle"></i> Add Transaction</h5>
+            <hr>
+
+            <form id="record-form" class="row g-3" action="/api/records" method="POST">
+              <!-- Type Selector -->
+              <div class="col-md-12 row mb-3 ml-1 mr-4">
+                <label for="record-type" class="col-md-4 col-form-label">Type<span class="field-required">*</span></label>
+                <select class="custom-select col-md-8" id="record-type" name="type" required>
+                  <option value="">Select Type</option>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </div>
+
+              <!-- Name -->
+              <div class="col-md-12 row mb-3 ml-1 mr-4">
+                <label for="name" class="col-md-4 col-form-label">Name<span class="field-required">*</span></label>
+                <input type="text" name="name" class="form-control col-md-8" id="name" required maxlength="15">
+              </div>
+
+              <!-- Date -->
+              <div class="col-md-12 row mb-3 ml-1 mr-4">
+                <label for="date" class="col-md-4 col-form-label">Date<span class="field-required">*</span></label>
+                <input type="date" name="date" class="form-control col-md-8 form-date" id="date" required>
+              </div>
+
+              <!-- Category (only shown if expense) -->
+              <div class="col-md-12 row mb-3 ml-1 mr-4" id="category-field" style="display: none;">
+                <label for="category" class="col-md-4 col-form-label">Category<span class="field-required">*</span></label>
+                <select class="custom-select col-md-8" name="categoryId" id="category">
+                  <option value="">Select Category</option>
+                  <option value="1">Food</option>
+                  <option value="2">Rent</option>
+                  <option value="3">Travel</option>
+                  <option value="4">Shopping</option>
+                  <option value="5">Entertainment</option>
+                </select>
+              </div>
+
+              <!-- Merchant (only for expense) -->
+              <div class="col-md-12 row mb-3 ml-1 mr-4" id="merchant-field" style="display: none;">
+                <label for="merchant" class="col-md-4 col-form-label">Merchant</label>
+                <input type="text" name="merchant" class="form-control col-md-8" id="merchant">
+              </div>
+
+              <!-- Amount -->
+              <div class="col-md-12 row mb-3 ml-1 mr-4">
+                <label for="amount" class="col-md-4 col-form-label">Amount<span class="field-required">*</span></label>
+                <input type="number" name="amount" class="form-control col-md-8" id="amount" required min="1" max="999999">
+              </div>
+
+              <!-- Submit Button -->
+              <div class="col-md-12 d-flex justify-content-end mr-4">
+                <button class="btn btn-success" type="submit">Create</button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script>
+    const typeDropdown = document.getElementById('record-type');
+    const categoryField = document.getElementById('category-field');
+    const merchantField = document.getElementById('merchant-field');
+
+    // Show/hide fields based on selected type
+    typeDropdown.addEventListener('change', () => {
+      const selectedType = typeDropdown.value;
+
+      if (selectedType === 'expense') {
+        categoryField.style.display = 'block';
+        merchantField.style.display = 'block';
+      } else if (selectedType === 'revenue') {
+        categoryField.style.display = 'none';
+        merchantField.style.display = 'none';
+      } else {
+        categoryField.style.display = 'none';
+        merchantField.style.display = 'none';
+      }
+    });
+
+    // Handle form submission
+    document.getElementById('record-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const recordType = typeDropdown.value;
+      const name = document.getElementById('name').value.trim();
+      const date = document.getElementById('date').value;
+      const amount = parseFloat(document.getElementById('amount').value, 10);
+      const categoryId = document.getElementById('category').value;
+      const merchant = document.getElementById('merchant').value.trim();
+
+      // Basic validation
+      if (!name || !date || !amount || !recordType) {
+        alert('Please fill out all required fields.');
+        return;
+      }
+
+      const payload = {
+        name,
+        date,
+        amount,
+        type: recordType,
+        ...(recordType === 'expense' && { categoryId, merchant })
+      };
+
+      try {
+        const response = await fetch('/api/records', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          alert(`${recordType.charAt(0).toUpperCase() + recordType.slice(1)} added!`);
+          window.location.href = '/premium'; // Redirect after success
+        } else {
+          alert(result.message || 'Failed to add record');
+        }
+
+      } catch (err) {
+        console.error("Error submitting form:", err);
+        alert('Something went wrong. Check console for details.');
+      }
+    });
+  </script>
+
+</body>
+</html>

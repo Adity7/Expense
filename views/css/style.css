@@ -1,0 +1,44 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f6;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card {
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    border: none;
+}
+
+.card-header {
+    font-weight: 600;
+}
+
+/* Custom background color for the leaderboard card header */
+.bg-purple {
+    background-color: #6f42c1; /* A nice bootstrap-like purple */
+}
+
+/* Ensure the dark mode toggle switch label is visible against a light background if needed */
+.custom-control-label.text-white {
+    /* This class is from the HTML, but in light mode, we might want to adjust it if it's ever not on a dark nav */
+    color: #343a40 !important; /* Example: make it dark for light backgrounds */
+}
+
+/* When the navbar is on a light background, ensure the switch is visible */
+.navbar-light .custom-control-label.text-white {
+     color: #343a40 !important;
+}
+
+/* Basic styling for the premium badge */
+.navbar-text .fa-star {
+    color: #ffc107;
+}
+
+/* Adds a bit of spacing to the add record button */
+.d-flex.justify-content-between.align-items-center > .btn {
+    white-space: nowrap;
+}

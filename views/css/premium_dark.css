@@ -1,0 +1,72 @@
+body.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+.dark-mode .card {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    color: #e0e0e0;
+}
+
+.dark-mode .card-header {
+    background-color: #2a2a2a !important;
+    border-bottom: 1px solid #333;
+}
+
+.dark-mode .h1, .dark-mode .h2, .dark-mode .h3, .dark-mode .h4, .dark-mode .h5 {
+    color: #ffffff;
+}
+
+.dark-mode .text-muted {
+    color: #888 !important;
+}
+
+.dark-mode .form-control {
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+}
+
+.dark-mode .form-control:focus {
+    background-color: #333;
+    border-color: #007bff;
+    color: #e0e0e0;
+}
+
+.dark-mode .list-group-item {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+}
+
+/* Make the active user on the leaderboard stand out */
+.dark-mode .list-group-item-primary {
+    background-color: #004085;
+    border-color: #005cbf;
+}
+
+
+/* Specific overrides for cards that have their own background colors */
+.dark-mode .bg-danger {
+    background-color: #5d2126 !important;
+}
+.dark-mode .bg-success {
+    background-color: #1c4a2a !important;
+}
+.dark-mode .bg-info {
+    background-color: #1e525f !important;
+}
+.dark-mode .bg-warning {
+    background-color: #665120 !important;
+    color: #e0e0e0 !important; /* Ensure text is readable */
+}
+.dark-mode .bg-purple {
+    background-color: #4a2d59 !important;
+}
+
+
+/* Variables for Chart.js text color in dark mode */
+body.dark-mode {
+    --chart-text-color: #e0e0e0;
+    --chart-grid-color: rgba(255, 255, 255, 0.1);
+}
