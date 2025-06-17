@@ -132,3 +132,6 @@ db.sequelize.authenticate()
         console.error("❌ Unable to start server:", err);
         process.exit(1);
     })
+
+
+module.exports = app;
